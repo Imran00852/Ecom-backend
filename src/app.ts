@@ -1,16 +1,16 @@
-import express, { Request, Response } from "express";
-import { config } from "dotenv";
-import { connectDB } from "./utils/features";
-import { errorMiddleware } from "./middlewares/error";
-import NodeCache from "node-cache";
-import Stripe from "stripe";
+import { v2 as cloudinary } from "cloudinary";
 import cors from "cors";
+import { config } from "dotenv";
+import express, { Request, Response } from "express";
+import Stripe from "stripe";
+import { errorMiddleware } from "./middlewares/error";
+import { connectDB, connectRedis } from "./utils/features";
 
-import userRoutes from "./routes/user";
-import productRoutes from "./routes/product";
 import orderRoutes from "./routes/order";
 import paymentRoutes from "./routes/payment";
+import productRoutes from "./routes/product";
 import dashboardRoutes from "./routes/stats";
+import userRoutes from "./routes/user";
 
 config({
   path: "./.env",
@@ -19,10 +19,18 @@ config({
 const port = process.env.PORT;
 const mongo_uri = process.env.MONGO_URI || "";
 const stripeKey = process.env.STRIPE_KEY || "";
+const redis_uri = process.env.REDIS_URI || "";
+export const redisTTL = Number(process.env.REDIS_TTL) || 60 * 60 * 4;
 
 connectDB(mongo_uri);
-export const myCache = new NodeCache();
+export const redis = connectRedis(redis_uri);
 export const stripe = new Stripe(stripeKey);
+
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
 
 const app = express();
 app.use(express.json());

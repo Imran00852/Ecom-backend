@@ -11,6 +11,7 @@ export interface NewProductReqBody {
   name: string;
   price: number;
   stock: number;
+  description: string;
   category: string;
 }
 
@@ -35,6 +36,7 @@ export interface BaseQuery {
 
 export type InvalidateCacheProps = {
   product?: boolean;
+  review?: boolean;
   order?: boolean;
   admin?: boolean;
   userId?: string;

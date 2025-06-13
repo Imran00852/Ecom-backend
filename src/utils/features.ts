@@ -1,7 +1,61 @@
-import mongoose, { Document } from "mongoose";
-import { myCache } from "../app";
+import { v2 as cloudinary, UploadApiResponse } from "cloudinary";
+import { Redis } from "ioredis";
+import mongoose, { Document, Types } from "mongoose";
+import { redis } from "../app";
 import { Product } from "../models/product";
+import { Review } from "../models/review";
 import { InvalidateCacheProps, OrderItemType } from "../types/types";
+
+export const findAverageRating = async (productId: Types.ObjectId) => {
+  let totalRating = 0;
+  const reviews = await Review.find({ product: productId });
+  reviews.forEach((review) => {
+    totalRating += review.rating;
+  });
+
+  const averageRating = Math.floor(totalRating / reviews.length) || 0;
+
+  return { ratings: averageRating, numOfReviews: reviews.length };
+};
+
+const getBase64 = (file: Express.Multer.File) =>
+  `data:${file.mimetype};base64,${file.buffer.toString("base64")}`;
+
+export const uploadToCloudinary = async (files: Express.Multer.File[]) => {
+  const promises = files.map(async (file) => {
+    return new Promise<UploadApiResponse>((resolve, reject) => {
+      cloudinary.uploader.upload(getBase64(file), (error, result) => {
+        if (error) return reject(error);
+        resolve(result!);
+      });
+    });
+  });
+  const result = await Promise.all(promises);
+  return result.map((i) => ({
+    public_id: i.public_id,
+    url: i.secure_url,
+  }));
+};
+
+export const deleteFromCloudinary = async (publicIds: string[]) => {
+  const promises = publicIds.map((id) => {
+    return new Promise<void>((resolve, reject) => {
+      cloudinary.uploader.destroy(id, (error, result) => {
+        if (error) return reject(error);
+        resolve();
+      });
+    });
+  });
+  await Promise.all(promises);
+};
+
+export const connectRedis = (redisURI: string) => {
+  const redis = new Redis(redisURI);
+  redis.on("connect", () => console.log("Redis connected"));
+  redis.on("error", (e) => console.log(e));
+
+  return redis;
+};
 
 export const connectDB = async (uri: string) => {
   await mongoose
@@ -14,14 +68,19 @@ export const connectDB = async (uri: string) => {
     .catch((err) => console.log(err));
 };
 
-export const invalidatesCache = ({
+export const invalidatesCache = async ({
   product,
+  review,
   order,
   admin,
   userId,
   orderId,
   productId,
 }: InvalidateCacheProps) => {
+  if (review) {
+    await redis.del(`reviews-${productId}`);
+  }
+
   if (product) {
     const productKeys: string[] = [
       "all-products",
@@ -35,7 +94,7 @@ export const invalidatesCache = ({
     if (typeof productId === "object")
       productKeys.forEach((i) => productKeys.push(`product-${i}`));
 
-    myCache.del(productKeys);
+    await redis.del(productKeys);
   }
   if (order) {
     const orderKeys: string[] = [
@@ -44,10 +103,10 @@ export const invalidatesCache = ({
       `order-${orderId}`,
     ];
 
-    myCache.del(orderKeys);
+    await redis.del(orderKeys);
   }
   if (admin) {
-    myCache.del([
+    await redis.del([
       "admin-stats",
       "admin-pie-charts",
       "admin-bar-charts",
