@@ -20,11 +20,10 @@ const port = process.env.PORT;
 const mongo_uri = process.env.MONGO_URI || "";
 const stripeKey = process.env.STRIPE_KEY || "";
 const redis_uri = process.env.REDIS_URI || "";
-const redis_token = process.env.REDIS_TOKEN || "";
 export const redisTTL = Number(process.env.REDIS_TTL) || 60 * 60 * 4;
 
 connectDB(mongo_uri);
-export const redis = connectRedis({url:redis_uri,token:redis_token});
+export const redis = connectRedis(redis_uri);
 export const stripe = new Stripe(stripeKey);
 
 cloudinary.config({
