@@ -49,8 +49,8 @@ export const deleteFromCloudinary = async (publicIds: string[]) => {
   await Promise.all(promises);
 };
 
-export const connectRedis = (redisURI: string) => {
-  const redis = new Redis(redisURI);
+export const connectRedis = (url: string,token:string) => {
+  const redis = new Redis({url,token});
   redis.on("connect", () => console.log("Redis connected"));
   redis.on("error", (e) => console.log(e));
 
